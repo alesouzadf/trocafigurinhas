@@ -10,3 +10,5 @@ frontend/.env.local
 frontend/.env.production.local
 npm-debug.log*
 .DS_Store
+.vercel
+.env*
