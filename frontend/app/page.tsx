@@ -19,10 +19,7 @@ const initialForm: UserForm = {
   telefone: "",
 };
 
-const apiBaseUrl =
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.API_URL ||
-  "http://localhost:3001";
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "";
 
 const getUserIdFromToken = (token: string) => {
   try {
