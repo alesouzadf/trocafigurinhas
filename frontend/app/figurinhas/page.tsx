@@ -37,6 +37,11 @@ const emptyFilter: FigurinhaFilter = {
   nome_jogador: "",
 };
 
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "http://localhost:3001";
+
 const timesDisponiveis = [
   "Alemanha",
   "Argentina",
@@ -93,14 +98,11 @@ export default function FigurinhasPage() {
   const fetchFigurinhas = async (token: string) => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/figurinhas`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`${apiBaseUrl}/figurinhas`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
 
       if (!response.ok) {
         throw new Error("Sessão expirada.");
@@ -205,7 +207,7 @@ export default function FigurinhasPage() {
     }
 
     try {
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/figurinhas${editingId ? `/${editingId}` : ""}`;
+      const url = `${apiBaseUrl}/figurinhas${editingId ? `/${editingId}` : ""}`;
       const method = editingId ? "PATCH" : "POST";
 
       const response = await fetch(url, {
@@ -258,15 +260,12 @@ export default function FigurinhasPage() {
     }
 
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/figurinhas/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`${apiBaseUrl}/figurinhas/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
 
       if (!response.ok) {
         const data = await response.json();

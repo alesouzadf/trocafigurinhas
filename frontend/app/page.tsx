@@ -19,6 +19,11 @@ const initialForm: UserForm = {
   telefone: "",
 };
 
+const apiBaseUrl =
+  process.env.NEXT_PUBLIC_API_URL ||
+  process.env.API_URL ||
+  "http://localhost:3001";
+
 const getUserIdFromToken = (token: string) => {
   try {
     const payload = token.split(".")[1];
@@ -97,16 +102,13 @@ export default function HomePage() {
               telefone: form.telefone,
             };
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/auth/${endpoint}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
+      const response = await fetch(`${apiBaseUrl}/auth/${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify(payload),
+      });
 
       const data = await response.json();
 

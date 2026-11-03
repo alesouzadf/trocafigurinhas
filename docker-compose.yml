@@ -18,12 +18,13 @@ services:
     build:
       context: ./frontend
       args:
-        NEXT_PUBLIC_API_URL: http://backend:3001
+        API_URL: http://backend:3001
     container_name: troca-figurinhas-frontend
     restart: unless-stopped
     depends_on:
       - backend
     environment:
+      API_URL: http://backend:3001
       NEXT_PUBLIC_API_URL: http://backend:3001
       NODE_ENV: production
     ports:
