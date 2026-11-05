@@ -355,6 +355,163 @@ export default function FigurinhasPage() {
     window.URL.revokeObjectURL(url);
   };
 
+  const printFigurinhas = () => {
+    const renderRow = (figurinha: Figurinha) => {
+      const equipe = figurinha.equipe || "-";
+      const jogador = figurinha.nome_jogador || "-";
+      const categoria = figurinha.categoria || "-";
+      const fotoHtml = figurinha.foto
+        ? `<img src="${figurinha.foto}" alt="${jogador}" style="width: 54px; height: 54px; object-fit: contain; display: block; margin: 0 auto; border-radius: 8px; background: #f8fafc; border: 1px solid #dfe7f5;" />`
+        : "-";
+
+      return `
+        <tr>
+          <td>${figurinha.figurinha_id}</td>
+          <td>${equipe}</td>
+          <td>${fotoHtml}</td>
+          <td>${jogador}</td>
+          <td>${categoria}</td>
+          <td>${figurinha.quantidade}</td>
+        </tr>
+      `;
+    };
+
+    const rows = filteredList.map(renderRow).join("");
+    const printWindow = window.open("", "_blank", "width=980,height=700");
+
+    if (!printWindow) {
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Figurinhas - Impressão</title>
+          <style>
+            :root {
+              --bg: #f8fafc;
+              --text: #0f172a;
+              --muted: #475569;
+              --border: #dfe7f5;
+              --thead: #f1f5f9;
+            }
+
+            * { box-sizing: border-box; }
+
+            body {
+              margin: 0;
+              padding: 24px;
+              font-family: Arial, Helvetica, sans-serif;
+              background: var(--bg);
+              color: var(--text);
+            }
+
+            h1 {
+              margin: 0 0 8px;
+              font-size: 24px;
+              color: var(--text);
+            }
+
+            .meta {
+              margin: 0 0 18px;
+              color: var(--muted);
+              font-size: 12px;
+              font-weight: 700;
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              background: white;
+              border: 1px solid var(--border);
+              box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04);
+            }
+
+            thead th {
+              background: var(--thead);
+              color: var(--text);
+              font-size: 11px;
+              font-weight: 700;
+              letter-spacing: 0.06em;
+              text-transform: uppercase;
+              padding: 12px 10px;
+              border: 1px solid var(--border);
+              text-align: left;
+            }
+
+            tbody td {
+              padding: 10px 10px;
+              border: 1px solid var(--border);
+              font-size: 12px;
+              color: var(--text);
+              vertical-align: middle;
+            }
+
+            tbody tr:nth-child(even) {
+              background: #f8fbff;
+            }
+
+            .empty {
+              padding: 18px;
+              text-align: center;
+              color: var(--muted);
+              background: white;
+              border: 1px solid var(--border);
+            }
+
+            @media print {
+              body {
+                background: white;
+                padding: 0;
+              }
+
+              table {
+                box-shadow: none;
+              }
+
+              thead {
+                display: table-header-group;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>Lista de figurinhas</h1>
+          <p class="meta">Total: ${filteredList.length}</p>
+          ${
+            rows
+              ? `
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Número</th>
+                      <th>Equipe</th>
+                      <th>Foto</th>
+                      <th>Jogador</th>
+                      <th>Categoria</th>
+                      <th>Quantidade</th>
+                    </tr>
+                  </thead>
+                  <tbody>${rows}</tbody>
+                </table>
+              `
+              : '<div class="empty">Nenhuma figurinha encontrada.</div>'
+          }
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 300);
+  };
+
   return (
     <main className="figurinhas-shell">
       <div className="figurinhas-card">
@@ -490,13 +647,22 @@ export default function FigurinhasPage() {
         <div className="table-section">
           <div className="table-header-row">
             <h3>Minhas figurinhas</h3>
-            <button
-              type="button"
-              className="secondary-button small-button"
-              onClick={exportFigurinhasTxt}
-            >
-              Salvar em .txt
-            </button>
+            <div className="topbar-actions">
+              <button
+                type="button"
+                className="secondary-button small-button"
+                onClick={printFigurinhas}
+              >
+                Imprimir
+              </button>
+              <button
+                type="button"
+                className="secondary-button small-button"
+                onClick={exportFigurinhasTxt}
+              >
+                Salvar em .txt
+              </button>
+            </div>
           </div>
 
           <div className="form-grid" style={{ marginBottom: 16 }}>
