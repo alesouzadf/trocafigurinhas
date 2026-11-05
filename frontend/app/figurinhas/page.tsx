@@ -5,69 +5,51 @@ import { useRouter } from "next/navigation";
 
 type Figurinha = {
   id: string;
-  time: string;
-  categoria: number;
+  figurinha_id: number;
+  quantidade: number;
+  equipe: string;
+  foto: string;
   nome_jogador: string;
-  quantidade_repetidas: number;
+  categoria: string;
 };
 
 type FigurinhaForm = {
-  time: string;
-  categoria: number | "";
-  nome_jogador: string;
-  quantidade_repetidas: number;
+  figurinha_id: number | "";
+  quantidade: number;
 };
 
 type FigurinhaFilter = {
-  time: string;
-  categoria: string;
+  figurinha_id: string;
+  equipe: string;
   nome_jogador: string;
+  categoria: string;
+};
+
+type CatalogFigurinha = {
+  id: number;
+  figurinha_id: number;
+  nome_jogador: string;
+  foto: string;
+  equipe: string;
+  categoria: string;
 };
 
 const emptyForm: FigurinhaForm = {
-  time: "",
-  categoria: "",
-  nome_jogador: "",
-  quantidade_repetidas: 0,
+  figurinha_id: "",
+  quantidade: 0,
 };
 
 const emptyFilter: FigurinhaFilter = {
-  time: "",
-  categoria: "",
+  figurinha_id: "",
+  equipe: "",
   nome_jogador: "",
+  categoria: "",
 };
 
 const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_URL ||
   process.env.API_URL ||
   "http://localhost:3001";
-
-const timesDisponiveis = [
-  "Alemanha",
-  "Argentina",
-  "Austrália",
-  "Bélgica",
-  "Catar",
-  "E.U.A",
-  "França",
-  "Noruega",
-  "Paraguai",
-  "Suécia",
-  "África do Sul",
-  "Canadá",
-  "Colômbia",
-  "Croácia",
-  "Escócia",
-  "Espanha",
-  "Holanda",
-  "Inglaterra",
-  "Japão",
-  "Áustria",
-  "Brasil",
-  "México",
-  "Portugal",
-  "Uruguai",
-];
 
 export default function FigurinhasPage() {
   const router = useRouter();
@@ -77,8 +59,11 @@ export default function FigurinhasPage() {
   const [selectedFigurinha, setSelectedFigurinha] = useState<Figurinha | null>(
     null,
   );
+  const [selectedCatalogFigurinha, setSelectedCatalogFigurinha] =
+    useState<CatalogFigurinha | null>(null);
   const [filterForm, setFilterForm] = useState<FigurinhaFilter>(emptyFilter);
   const [loading, setLoading] = useState(false);
+  const [catalogLoading, setCatalogLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmAction, setConfirmAction] = useState<{
     type: "edit" | "delete";
@@ -95,6 +80,43 @@ export default function FigurinhasPage() {
     fetchFigurinhas(token);
   }, [router]);
 
+  const fetchCatalogFigurinha = async (figurinhaId: number) => {
+    if (!figurinhaId || Number(figurinhaId) <= 0) {
+      setSelectedCatalogFigurinha(null);
+      return;
+    }
+
+    const token = window.localStorage.getItem("troca-figurinhas-token");
+    if (!token) {
+      router.push("/");
+      return;
+    }
+
+    try {
+      setCatalogLoading(true);
+      const response = await fetch(
+        `${apiBaseUrl}/figurinhas/catalog/${figurinhaId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        setSelectedCatalogFigurinha(null);
+        return;
+      }
+
+      const data = (await response.json()) as CatalogFigurinha;
+      setSelectedCatalogFigurinha(data);
+    } catch {
+      setSelectedCatalogFigurinha(null);
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
   const fetchFigurinhas = async (token: string) => {
     setLoading(true);
     try {
@@ -108,53 +130,10 @@ export default function FigurinhasPage() {
         throw new Error("Sessão expirada.");
       }
 
-      const data = await response.json();
-      const storedUserId = Number(
-        window.localStorage.getItem("troca-figurinhas-user-id"),
+      const data = (await response.json()) as Figurinha[];
+      const sortedList = [...data].sort(
+        (a, b) => Number(a.figurinha_id) - Number(b.figurinha_id),
       );
-      const currentUserId = Number.isFinite(storedUserId)
-        ? storedUserId
-        : (() => {
-            const token = window.localStorage.getItem("troca-figurinhas-token");
-            if (!token) return null;
-
-            const payload = token.split(".")[1];
-            if (!payload) return null;
-
-            try {
-              const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
-              const decoded = window.atob(
-                normalized + "=".repeat((4 - (normalized.length % 4)) % 4),
-              );
-              const parsed = JSON.parse(decoded) as { sub?: number | string };
-              return parsed.sub !== undefined ? Number(parsed.sub) : null;
-            } catch {
-              return null;
-            }
-          })();
-
-      if (!Number.isFinite(Number(currentUserId))) {
-        throw new Error("Sessão inválida. Faça login novamente.");
-      }
-
-      const filteredList = data.filter(
-        (item: { usuario_id?: number | string }) =>
-          Number(item.usuario_id) === Number(currentUserId),
-      );
-
-      const sortedList = [...filteredList].sort((a, b) => {
-        const timeComparison = a.time.localeCompare(b.time, "pt-BR", {
-          sensitivity: "base",
-        });
-
-        if (timeComparison !== 0) {
-          return timeComparison;
-        }
-
-        return a.nome_jogador.localeCompare(b.nome_jogador, "pt-BR", {
-          sensitivity: "base",
-        });
-      });
 
       setList(sortedList);
     } catch (fetchError) {
@@ -175,13 +154,19 @@ export default function FigurinhasPage() {
     (field: keyof FigurinhaForm) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
       const value =
-        field === "categoria"
-          ? Number(event.target.value)
-          : field === "quantidade_repetidas"
-            ? Number(event.target.value)
-            : event.target.value;
+        field === "figurinha_id"
+          ? Number(event.target.value) || ""
+          : Number(event.target.value);
 
       setForm((current) => ({ ...current, [field]: value }));
+
+      if (field === "figurinha_id" && typeof value === "number" && value > 0) {
+        void fetchCatalogFigurinha(value);
+      }
+
+      if (field === "figurinha_id" && (value === "" || Number(value) <= 0)) {
+        setSelectedCatalogFigurinha(null);
+      }
     };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -195,20 +180,23 @@ export default function FigurinhasPage() {
     setError("");
 
     if (
-      !form.time.trim() ||
-      form.categoria === "" ||
-      !form.nome_jogador.trim() ||
-      form.quantidade_repetidas < 0
+      !form.figurinha_id ||
+      Number(form.figurinha_id) <= 0 ||
+      form.quantidade < 0
     ) {
-      setError(
-        "Preencha todos os campos para cadastrar ou alterar a figurinha.",
-      );
+      setError("Informe o número da figurinha e a quantidade para continuar.");
       return;
     }
 
     try {
       const url = `${apiBaseUrl}/figurinhas${editingId ? `/${editingId}` : ""}`;
       const method = editingId ? "PATCH" : "POST";
+      const body = editingId
+        ? { quantidade: Number(form.quantidade) }
+        : {
+            figurinha_id: Number(form.figurinha_id),
+            quantidade: Number(form.quantidade),
+          };
 
       const response = await fetch(url, {
         method,
@@ -216,7 +204,7 @@ export default function FigurinhasPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(form),
+        body: JSON.stringify(body),
       });
 
       const data = await response.json();
@@ -226,6 +214,7 @@ export default function FigurinhasPage() {
 
       setForm(emptyForm);
       setEditingId(null);
+      setSelectedCatalogFigurinha(null);
       await fetchFigurinhas(token);
     } catch (submitError) {
       setError(
@@ -241,11 +230,10 @@ export default function FigurinhasPage() {
     setSelectedFigurinha(null);
     setConfirmAction(null);
     setForm({
-      time: figurinha.time,
-      categoria: figurinha.categoria,
-      nome_jogador: figurinha.nome_jogador,
-      quantidade_repetidas: figurinha.quantidade_repetidas,
+      figurinha_id: figurinha.figurinha_id,
+      quantidade: figurinha.quantidade,
     });
+    void fetchCatalogFigurinha(figurinha.figurinha_id);
   };
 
   const handleDelete = (figurinha: Figurinha) => {
@@ -279,6 +267,7 @@ export default function FigurinhasPage() {
         setEditingId(null);
         setForm(emptyForm);
       }
+      setSelectedCatalogFigurinha(null);
       setConfirmAction(null);
     } catch (deleteError) {
       setError(
@@ -296,15 +285,15 @@ export default function FigurinhasPage() {
   };
 
   const filteredList = list.filter((figurinha) => {
-    const matchesTime =
-      !filterForm.time ||
-      figurinha.time
-        .toLowerCase()
-        .includes(filterForm.time.trim().toLowerCase());
+    const matchesNumero =
+      !filterForm.figurinha_id ||
+      String(figurinha.figurinha_id) === filterForm.figurinha_id.trim();
 
-    const matchesCategoria =
-      !filterForm.categoria ||
-      String(figurinha.categoria) === String(filterForm.categoria);
+    const matchesEquipe =
+      !filterForm.equipe ||
+      figurinha.equipe
+        .toLowerCase()
+        .includes(filterForm.equipe.trim().toLowerCase());
 
     const matchesJogador =
       !filterForm.nome_jogador ||
@@ -312,16 +301,22 @@ export default function FigurinhasPage() {
         .toLowerCase()
         .includes(filterForm.nome_jogador.trim().toLowerCase());
 
-    return matchesTime && matchesCategoria && matchesJogador;
+    const matchesCategoria =
+      !filterForm.categoria ||
+      String(figurinha.categoria)
+        .toLowerCase()
+        .includes(filterForm.categoria.trim().toLowerCase());
+
+    return matchesNumero && matchesEquipe && matchesJogador && matchesCategoria;
   });
 
   const handleFilterChange =
     (field: keyof FigurinhaFilter) =>
     (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-      const value =
-        field === "categoria" ? event.target.value : event.target.value;
-
-      setFilterForm((current) => ({ ...current, [field]: value }));
+      setFilterForm((current) => ({
+        ...current,
+        [field]: event.target.value,
+      }));
     };
 
   const clearFilters = () => {
@@ -330,18 +325,24 @@ export default function FigurinhasPage() {
 
   const applyFilterFromForm = () => {
     setFilterForm({
-      time: form.time,
-      categoria: form.categoria === "" ? "" : String(form.categoria),
-      nome_jogador: form.nome_jogador,
+      figurinha_id: form.figurinha_id === "" ? "" : String(form.figurinha_id),
+      equipe: selectedCatalogFigurinha?.equipe ?? "",
+      nome_jogador: selectedCatalogFigurinha?.nome_jogador ?? "",
+      categoria: selectedCatalogFigurinha?.categoria ?? "",
     });
   };
 
   const confirmFigurinha = confirmAction?.figurinha;
+  const displayedFigurinhaNumber =
+    form.figurinha_id !== "" && form.figurinha_id !== null
+      ? Number(form.figurinha_id)
+      : (selectedCatalogFigurinha?.figurinha_id ??
+        selectedCatalogFigurinha?.id);
 
   const exportFigurinhasTxt = () => {
     const linhas = filteredList.map(
       (figurinha) =>
-        `Time: ${figurinha.time} | Jogador: ${figurinha.nome_jogador} | Categoria: ${figurinha.categoria} | Repetidas: ${figurinha.quantidade_repetidas}`,
+        `Número: ${figurinha.figurinha_id} | Time: ${figurinha.equipe} | Jogador: ${figurinha.nome_jogador} | Categoria: ${figurinha.categoria} | Quantidade: ${figurinha.quantidade}`,
     );
 
     const content = linhas.join("\n");
@@ -382,54 +383,69 @@ export default function FigurinhasPage() {
         >
           <div className="form-grid">
             <label>
-              <span>Time</span>
+              <span>Número da figurinha</span>
               <input
-                type="text"
-                list="time-options"
-                value={form.time}
-                onChange={handleChange("time")}
-                placeholder="Ex: Brasil ou Argentina"
-              />
-              <datalist id="time-options">
-                {timesDisponiveis.map((time) => (
-                  <option key={time} value={time} />
-                ))}
-              </datalist>
-            </label>
-
-            <label>
-              <span>Categoria</span>
-              <select
-                value={form.categoria}
-                onChange={handleChange("categoria")}
-              >
-                <option value="">Selecione</option>
-                <option value={50}>50</option>
-                <option value={60}>60</option>
-                <option value={70}>70</option>
-              </select>
-            </label>
-
-            <label>
-              <span>Nome do jogador</span>
-              <input
-                type="text"
-                value={form.nome_jogador}
-                onChange={handleChange("nome_jogador")}
-                placeholder="Ex: Vinícius Júnior ou Lionel Messi"
+                type="number"
+                min={1}
+                value={form.figurinha_id}
+                onChange={handleChange("figurinha_id")}
+                placeholder="Ex: 42"
+                disabled={Boolean(editingId)}
+                readOnly={Boolean(editingId)}
               />
             </label>
 
             <label>
-              <span>Quantidade de repetidas</span>
+              <span>Quantidade</span>
               <input
                 type="number"
                 min={0}
-                value={form.quantidade_repetidas}
-                onChange={handleChange("quantidade_repetidas")}
+                value={form.quantidade}
+                onChange={handleChange("quantidade")}
               />
             </label>
           </div>
+
+          {catalogLoading && (
+            <p className="success-message">Buscando dados da figurinha...</p>
+          )}
+
+          {selectedCatalogFigurinha && (
+            <div className="detail-grid" style={{ marginTop: 16 }}>
+              {selectedCatalogFigurinha.foto && (
+                <div style={{ gridColumn: "1 / -1" }}>
+                  <img
+                    src={selectedCatalogFigurinha.foto}
+                    alt={selectedCatalogFigurinha.nome_jogador}
+                    style={{
+                      maxWidth: 180,
+                      maxHeight: 180,
+                      objectFit: "contain",
+                      borderRadius: 12,
+                      background: "#fff",
+                      padding: 8,
+                    }}
+                  />
+                </div>
+              )}
+              <div>
+                <span>Equipe</span>
+                <strong>{selectedCatalogFigurinha.equipe}</strong>
+              </div>
+              <div>
+                <span>Jogador</span>
+                <strong>{selectedCatalogFigurinha.nome_jogador}</strong>
+              </div>
+              <div>
+                <span>Categoria</span>
+                <strong>{selectedCatalogFigurinha.categoria}</strong>
+              </div>
+              <div>
+                <span>Número</span>
+                <strong>{displayedFigurinhaNumber ?? "-"}</strong>
+              </div>
+            </div>
+          )}
 
           {error && <p className="error-message">{error}</p>}
 
@@ -451,9 +467,7 @@ export default function FigurinhasPage() {
             <button
               type="button"
               className="secondary-button"
-              onClick={() => {
-                setFilterForm(emptyFilter);
-              }}
+              onClick={clearFilters}
             >
               Limpar filtros
             </button>
@@ -464,6 +478,7 @@ export default function FigurinhasPage() {
                 onClick={() => {
                   setEditingId(null);
                   setForm(emptyForm);
+                  setSelectedCatalogFigurinha(null);
                 }}
               >
                 Cancelar
@@ -484,23 +499,70 @@ export default function FigurinhasPage() {
             </button>
           </div>
 
+          <div className="form-grid" style={{ marginBottom: 16 }}>
+            <label>
+              <span>Filtrar por número</span>
+              <input
+                type="text"
+                value={filterForm.figurinha_id}
+                onChange={handleFilterChange("figurinha_id")}
+                placeholder="Ex: 42"
+              />
+            </label>
+
+            <label>
+              <span>Filtrar por nome</span>
+              <input
+                type="text"
+                value={filterForm.nome_jogador}
+                onChange={handleFilterChange("nome_jogador")}
+                placeholder="Ex: Neymar"
+              />
+            </label>
+
+            <label>
+              <span>Filtrar por categoria</span>
+              <select
+                value={filterForm.categoria}
+                onChange={handleFilterChange("categoria")}
+              >
+                <option value="">Todas</option>
+                <option value="CINQUENTÃO">CINQUENTÃO</option>
+                <option value="SESSENTÃO">SESSENTÃO</option>
+                <option value="SETENTÃO">SETENTÃO</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Filtrar por equipe</span>
+              <input
+                type="text"
+                value={filterForm.equipe}
+                onChange={handleFilterChange("equipe")}
+                placeholder="Ex: Brasil"
+              />
+            </label>
+          </div>
+
           {list.length === 0 ? (
             <div className="empty-state">
               Nenhuma figurinha cadastrada ainda.
             </div>
           ) : filteredList.length === 0 ? (
             <div className="empty-state">
-              Nenhuma figurinha encontrada para o time informado.
+              Nenhuma figurinha encontrada para os filtros informados.
             </div>
           ) : (
             <div className="table-wrapper">
               <table className="figurinha-table">
                 <thead>
                   <tr>
-                    <th>Time</th>
+                    <th>Número</th>
+                    <th>Equipe</th>
+                    <th>Foto</th>
                     <th>Jogador</th>
                     <th>Categoria</th>
-                    <th>Repetidas</th>
+                    <th>Quantidade</th>
                     <th>Ações</th>
                   </tr>
                 </thead>
@@ -511,10 +573,26 @@ export default function FigurinhasPage() {
                       className="table-row"
                       onClick={() => setSelectedFigurinha(figurinha)}
                     >
-                      <td>{figurinha.time}</td>
+                      <td>{figurinha.figurinha_id}</td>
+                      <td>{figurinha.equipe}</td>
+                      <td>
+                        {figurinha.foto ? (
+                          <img
+                            src={figurinha.foto}
+                            alt={figurinha.nome_jogador}
+                            style={{
+                              width: 48,
+                              height: 48,
+                              objectFit: "contain",
+                            }}
+                          />
+                        ) : (
+                          "-"
+                        )}
+                      </td>
                       <td>{figurinha.nome_jogador}</td>
                       <td>{figurinha.categoria}</td>
-                      <td>{figurinha.quantidade_repetidas}</td>
+                      <td>{figurinha.quantidade}</td>
                       <td>
                         <div className="table-actions">
                           <button
@@ -570,8 +648,12 @@ export default function FigurinhasPage() {
 
             <div className="detail-grid">
               <div>
-                <span>Time</span>
-                <strong>{selectedFigurinha.time}</strong>
+                <span>Número</span>
+                <strong>{selectedFigurinha.figurinha_id}</strong>
+              </div>
+              <div>
+                <span>Equipe</span>
+                <strong>{selectedFigurinha.equipe}</strong>
               </div>
               <div>
                 <span>Jogador</span>
@@ -583,9 +665,23 @@ export default function FigurinhasPage() {
               </div>
               <div>
                 <span>Quantidade</span>
-                <strong>{selectedFigurinha.quantidade_repetidas}</strong>
+                <strong>{selectedFigurinha.quantidade}</strong>
               </div>
             </div>
+
+            {selectedFigurinha.foto && (
+              <div style={{ marginTop: 16 }}>
+                <img
+                  src={selectedFigurinha.foto}
+                  alt={selectedFigurinha.nome_jogador}
+                  style={{
+                    maxWidth: 180,
+                    maxHeight: 180,
+                    objectFit: "contain",
+                  }}
+                />
+              </div>
+            )}
 
             <div className="detail-actions">
               <button
@@ -629,8 +725,8 @@ export default function FigurinhasPage() {
 
             <p>
               {confirmAction.type === "edit"
-                ? `Deseja alterar a figurinha de ${confirmFigurinha.time} - ${confirmFigurinha.nome_jogador}?`
-                : `Deseja excluir a figurinha de ${confirmFigurinha.time} - ${confirmFigurinha.nome_jogador}?`}
+                ? `Deseja alterar a figurinha ${confirmFigurinha.figurinha_id} - ${confirmFigurinha.nome_jogador}?`
+                : `Deseja excluir a figurinha ${confirmFigurinha.figurinha_id} - ${confirmFigurinha.nome_jogador}?`}
             </p>
 
             <div className="detail-actions">

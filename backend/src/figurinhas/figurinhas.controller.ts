@@ -25,6 +25,14 @@ export class FigurinhasController {
     return this.figurinhasService.listByUser(req.user.sub);
   }
 
+  @Get("catalog/:figurinhaId")
+  async getCatalogFigurinha(
+    @Req() _req: Request & { user: { sub: number } },
+    @Param("figurinhaId", ParseIntPipe) figurinhaId: number,
+  ) {
+    return this.figurinhasService.findCatalogFigurinha(figurinhaId);
+  }
+
   @Post()
   async create(
     @Req() req: Request & { user: { sub: number } },

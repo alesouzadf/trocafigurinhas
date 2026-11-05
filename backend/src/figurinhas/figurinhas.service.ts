@@ -9,28 +9,54 @@ export class FigurinhasService {
       .from("figurinhas")
       .select("*")
       .eq("usuario_id", Number(userId))
-      .order("time", { ascending: true })
-      .order("nome_jogador", { ascending: true });
+      .order("figurinha_id", { ascending: true });
 
     if (error) {
       throw new Error(error.message);
     }
 
-    return (data ?? []).map(
-      (item) => this.normalizeRow(item) as Record<string, any>,
-    );
+    const rows = data ?? [];
+
+    const enriched = [] as Record<string, any>[];
+    for (const row of rows) {
+      const figurinha = await this.fetchFigurinhaDetails(
+        Number(row.figurinha_id),
+      );
+      enriched.push({
+        id: row.id,
+        figurinha_id: row.figurinha_id,
+        quantidade: row.quantidade ?? 0,
+        equipe: figurinha?.equipe ?? "",
+        foto: figurinha?.foto ?? "",
+        nome_jogador: figurinha?.nome_jogador ?? "",
+        categoria: figurinha?.categoria ?? "",
+      });
+    }
+
+    return enriched;
+  }
+
+  async findCatalogFigurinha(figurinhaId: number | string) {
+    const figurinha = await this.fetchFigurinhaDetails(Number(figurinhaId));
+
+    if (!figurinha) {
+      throw new NotFoundException("Figurinha não encontrada.");
+    }
+
+    return figurinha;
   }
 
   async create(userId: number | string, dto: CreateFigurinhaDto) {
+    await this.ensureUserExists(userId);
+
+    const payload = this.buildCollectionPayload(userId, {
+      figurinha_id: dto.figurinha_id,
+      quantidade: dto.quantidade,
+    });
+
     const { data, error } = await supabase
       .from("figurinhas")
-      .insert({
-        usuario_id: Number(userId),
-        time: dto.time,
-        categoria: dto.categoria,
-        nome_jogador: dto.nome_jogador,
-        quantidade: dto.quantidade_repetidas,
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -46,27 +72,21 @@ export class FigurinhasService {
     id: number | string,
     dto: UpdateFigurinhaDto,
   ) {
+    await this.ensureUserExists(userId);
+
     const existing = (await this.ensureBelongsToUser(userId, id)) as Record<
       string,
       any
     >;
 
-    const payload = {
-      ...(dto.time !== undefined ? { time: dto.time } : {}),
-      ...(dto.categoria !== undefined ? { categoria: dto.categoria } : {}),
-      ...(dto.nome_jogador !== undefined
-        ? { nome_jogador: dto.nome_jogador }
-        : {}),
-      ...(dto.quantidade_repetidas !== undefined
-        ? { quantidade: dto.quantidade_repetidas }
-        : {}),
-    };
+    const payload = this.buildCollectionPayload(userId, {
+      ...(dto.quantidade !== undefined ? { quantidade: dto.quantidade } : {}),
+    });
 
     const { data, error } = await supabase
       .from("figurinhas")
       .update(payload)
       .eq("id", Number(id))
-      .eq("usuario_id", Number(userId))
       .select()
       .single();
 
@@ -86,8 +106,7 @@ export class FigurinhasService {
     const { error } = await supabase
       .from("figurinhas")
       .delete()
-      .eq("id", Number(id))
-      .eq("usuario_id", Number(userId));
+      .eq("id", Number(id));
 
     if (error) {
       throw new Error(error.message);
@@ -96,14 +115,73 @@ export class FigurinhasService {
     return { deleted: true, id: existing.id };
   }
 
+  private buildCollectionPayload(
+    userId: number | string,
+    payload: Record<string, any>,
+  ) {
+    const nextPayload = { ...payload };
+
+    if (userId !== undefined && userId !== null && userId !== "") {
+      nextPayload.usuario_id = Number(userId);
+    }
+
+    return nextPayload;
+  }
+
+  private async ensureUserExists(userId: number | string) {
+    const { data, error } = await supabase
+      .from("usuario")
+      .select("id")
+      .eq("id", Number(userId))
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      throw new NotFoundException(
+        "Usuário autenticado não encontrado na base de dados.",
+      );
+    }
+  }
+
+  private async fetchFigurinhaDetails(figurinhaId: number) {
+    const { data, error } = await supabase
+      .from("figurinha")
+      .select("id, nome_jogador, img_jogador, equipe, categoria")
+      .eq("id", figurinhaId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return {
+      id: data.id,
+      figurinha_id: data.id,
+      nome_jogador: data.nome_jogador ?? "",
+      foto: data.img_jogador ?? "",
+      equipe: data.equipe ?? "",
+      categoria: data.categoria ?? "",
+    };
+  }
+
   private normalizeRow(row: Record<string, any> | null | undefined) {
     if (!row) return row;
 
-    const { quantidade, ...rest } = row;
     return {
-      ...rest,
       id: row.id,
-      quantidade_repetidas: quantidade ?? row.quantidade_repetidas ?? 0,
+      figurinha_id: row.figurinha_id ?? row.figurinhaId ?? null,
+      quantidade: row.quantidade ?? row.quantidade_repetidas ?? 0,
+      equipe: row.equipe ?? "",
+      foto: row.foto ?? row.img_jogador ?? "",
+      nome_jogador: row.nome_jogador ?? "",
+      categoria: row.categoria ?? "",
     };
   }
 
@@ -115,10 +193,17 @@ export class FigurinhasService {
       .from("figurinhas")
       .select("*")
       .eq("id", Number(id))
-      .eq("usuario_id", Number(userId))
-      .single();
+      .maybeSingle();
 
     if (error || !data) {
+      throw new NotFoundException("Figurinha não encontrada.");
+    }
+
+    if (
+      Object.prototype.hasOwnProperty.call(data, "usuario_id") &&
+      data.usuario_id !== null &&
+      Number(data.usuario_id) !== Number(userId)
+    ) {
       throw new NotFoundException(
         "Figurinha não encontrada para este usuário.",
       );
