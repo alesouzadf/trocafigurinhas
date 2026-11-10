@@ -555,7 +555,50 @@ export default function FigurinhasPage() {
       (figurinha) => Number(figurinha.quantidade) === 0,
     );
 
-    printFigurinhas(faltantes, "Figurinhas com quantidade 0");
+    const storedUserName =
+      window.localStorage.getItem("troca-figurinhas-user-name") ||
+      (() => {
+        const token = window.localStorage.getItem("troca-figurinhas-token");
+        if (!token) return "usuario";
+
+        try {
+          const payload = token.split(".")[1];
+          if (!payload) return "usuario";
+
+          const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+          const decoded = window.atob(
+            normalized + "=".repeat((4 - (normalized.length % 4)) % 4),
+          );
+          const parsed = JSON.parse(decoded) as { email?: string };
+          return parsed.email?.split("@")[0] || "usuario";
+        } catch {
+          return "usuario";
+        }
+      })();
+
+    const sanitizedUserName = storedUserName
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase();
+
+    const linhas = faltantes.length
+      ? faltantes.map(
+          (figurinha) =>
+            `Número: ${figurinha.figurinha_id} | Time: ${figurinha.equipe} | Jogador: ${figurinha.nome_jogador} | Categoria: ${figurinha.categoria} | Quantidade: ${figurinha.quantidade}`,
+        )
+      : ["Nenhuma figurinha com quantidade igual a 0."];
+
+    const content = linhas.join("\n");
+    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${sanitizedUserName || "usuario"}_figurinhas_faltantes.txt`;
+    link.click();
+    window.URL.revokeObjectURL(url);
   };
 
   return (
