@@ -390,28 +390,31 @@ export default function FigurinhasPage() {
     window.URL.revokeObjectURL(url);
   };
 
-  const printFigurinhas = () => {
-    const renderRow = (figurinha: Figurinha) => {
-      const equipe = figurinha.equipe || "-";
-      const jogador = figurinha.nome_jogador || "-";
-      const categoria = figurinha.categoria || "-";
-      const fotoHtml = figurinha.foto
-        ? `<img src="${figurinha.foto}" alt="${jogador}" style="width: 54px; height: 54px; object-fit: contain; display: block; margin: 0 auto; border-radius: 8px; background: #f8fafc; border: 1px solid #dfe7f5;" />`
-        : "-";
+  const renderPrintRow = (figurinha: Figurinha) => {
+    const equipe = figurinha.equipe || "-";
+    const jogador = figurinha.nome_jogador || "-";
+    const categoria = figurinha.categoria || "-";
+    const fotoHtml = figurinha.foto
+      ? `<img src="${figurinha.foto}" alt="${jogador}" style="width: 54px; height: 54px; object-fit: contain; display: block; margin: 0 auto; border-radius: 8px; background: #f8fafc; border: 1px solid #dfe7f5;" />`
+      : "-";
 
-      return `
-        <tr>
-          <td>${figurinha.figurinha_id}</td>
-          <td>${equipe}</td>
-          <td>${fotoHtml}</td>
-          <td>${jogador}</td>
-          <td>${categoria}</td>
-          <td>${figurinha.quantidade}</td>
-        </tr>
-      `;
-    };
+    return `
+      <tr>
+        <td>${figurinha.figurinha_id}</td>
+        <td>${equipe}</td>
+        <td>${fotoHtml}</td>
+        <td>${jogador}</td>
+        <td>${categoria}</td>
+        <td>${figurinha.quantidade}</td>
+      </tr>
+    `;
+  };
 
-    const rows = filteredList.map(renderRow).join("");
+  const printFigurinhas = (
+    items: Figurinha[] = filteredList,
+    title = "Lista de figurinhas",
+  ) => {
+    const rows = items.map(renderPrintRow).join("");
     const printWindow = window.open("", "_blank", "width=980,height=700");
 
     if (!printWindow) {
@@ -515,8 +518,8 @@ export default function FigurinhasPage() {
           </style>
         </head>
         <body>
-          <h1>Lista de figurinhas</h1>
-          <p class="meta">Total: ${filteredList.length}</p>
+          <h1>${title}</h1>
+          <p class="meta">Total: ${items.length}</p>
           ${
             rows
               ? `
@@ -545,6 +548,14 @@ export default function FigurinhasPage() {
     setTimeout(() => {
       printWindow.print();
     }, 300);
+  };
+
+  const printFigurinhasSemQuantidade = () => {
+    const faltantes = filteredList.filter(
+      (figurinha) => Number(figurinha.quantidade) === 0,
+    );
+
+    printFigurinhas(faltantes, "Figurinhas com quantidade 0");
   };
 
   return (
@@ -686,9 +697,16 @@ export default function FigurinhasPage() {
               <button
                 type="button"
                 className="secondary-button small-button"
-                onClick={printFigurinhas}
+                onClick={() => printFigurinhas()}
               >
                 Imprimir
+              </button>
+              <button
+                type="button"
+                className="secondary-button small-button"
+                onClick={printFigurinhasSemQuantidade}
+              >
+                Imprimir faltantes
               </button>
               <button
                 type="button"
