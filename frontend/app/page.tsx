@@ -52,6 +52,51 @@ const formatPhone = (value: string) => {
   return `(${digits.slice(0, 2)})${digits.slice(2, 7)}-${digits.slice(7)}`;
 };
 
+const decodeTokenEmail = (token: string) => {
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = window.atob(
+      normalized + "=".repeat((4 - (normalized.length % 4)) % 4),
+    );
+    const parsed = JSON.parse(decoded) as { email?: string };
+
+    return parsed.email || null;
+  } catch {
+    return null;
+  }
+};
+
+const sanitizeUserFileName = (value: string) =>
+  value
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase() || "usuario";
+
+const getLoggedUserName = () => {
+  const storedName = window.localStorage.getItem("troca-figurinhas-user-name");
+  if (storedName) {
+    return storedName;
+  }
+
+  const token = window.localStorage.getItem("troca-figurinhas-token");
+  if (!token) {
+    return "usuario";
+  }
+
+  const email = decodeTokenEmail(token);
+  if (!email) {
+    return "usuario";
+  }
+
+  return email.split("@")[0] || "usuario";
+};
+
 export default function HomePage() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
@@ -116,6 +161,13 @@ export default function HomePage() {
       }
 
       window.localStorage.setItem("troca-figurinhas-token", data.token);
+      const userName = data?.user?.nome || form.nome || "usuario";
+      const normalizedUserName = sanitizeUserFileName(userName);
+      window.localStorage.setItem(
+        "troca-figurinhas-user-name",
+        normalizedUserName,
+      );
+
       const userIdFromToken = getUserIdFromToken(data.token);
       const userId = data?.user?.id ?? userIdFromToken;
       const numericUserId =

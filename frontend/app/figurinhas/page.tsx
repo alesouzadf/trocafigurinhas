@@ -340,17 +340,52 @@ export default function FigurinhasPage() {
         selectedCatalogFigurinha?.id);
 
   const exportFigurinhasTxt = () => {
-    const linhas = filteredList.map(
-      (figurinha) =>
-        `Número: ${figurinha.figurinha_id} | Time: ${figurinha.equipe} | Jogador: ${figurinha.nome_jogador} | Categoria: ${figurinha.categoria} | Quantidade: ${figurinha.quantidade}`,
+    const storedUserName =
+      window.localStorage.getItem("troca-figurinhas-user-name") ||
+      (() => {
+        const token = window.localStorage.getItem("troca-figurinhas-token");
+        if (!token) return "usuario";
+
+        try {
+          const payload = token.split(".")[1];
+          if (!payload) return "usuario";
+
+          const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+          const decoded = window.atob(
+            normalized + "=".repeat((4 - (normalized.length % 4)) % 4),
+          );
+          const parsed = JSON.parse(decoded) as { email?: string };
+          return parsed.email?.split("@")[0] || "usuario";
+        } catch {
+          return "usuario";
+        }
+      })();
+
+    const sanitizedUserName = storedUserName
+      .trim()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "")
+      .toLowerCase();
+
+    const figurinhasComQuantidadeMaiorQueUm = filteredList.filter(
+      (figurinha) => Number(figurinha.quantidade) > 1,
     );
+
+    const linhas = figurinhasComQuantidadeMaiorQueUm.length
+      ? figurinhasComQuantidadeMaiorQueUm.map(
+          (figurinha) =>
+            `Número: ${figurinha.figurinha_id} | Time: ${figurinha.equipe} | Jogador: ${figurinha.nome_jogador} | Categoria: ${figurinha.categoria} | Quantidade: ${figurinha.quantidade}`,
+        )
+      : ["Nenhuma figurinha com quantidade maior que 1."];
 
     const content = linhas.join("\n");
     const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "figurinhas.txt";
+    link.download = `${sanitizedUserName || "usuario"}_figurinhas.txt`;
     link.click();
     window.URL.revokeObjectURL(url);
   };
@@ -660,7 +695,7 @@ export default function FigurinhasPage() {
                 className="secondary-button small-button"
                 onClick={exportFigurinhasTxt}
               >
-                Salvar em .txt
+                Imprimir repetidas
               </button>
             </div>
           </div>
